@@ -55,7 +55,7 @@ app.post("/render", async (req, res) => {
 
     ffmpeg()
       .input(backgroundImage)
-.     .inputOptions(["-loop 1"])
+      .inputOptions(["-loop 1"])
       .input(tempAudio)
       .videoCodec("libx264")
       .audioCodec("aac")
