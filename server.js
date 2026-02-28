@@ -20,9 +20,29 @@ const tempDir = path.join(__dirname, "temp");
 if (!fs.existsSync(videosDir)) fs.mkdirSync(videosDir);
 if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
 
-// ✅ DIRECT DROPBOX BACKGROUND IMAGE
+// 🔥 Replace with your real Dropbox direct image link
 const backgroundImageURL =
   "https://dl.dropboxusercontent.com/scl/fi/bzy46bdurxp3hxo33eofy/thiruvalluvar_background.jpg?rlkey=a7n3mlhull5tpgrg45jmpl636&st=upz2ig9y&dl=1";
+
+// 🔥 Auto Text Wrap Function
+function wrapText(text, maxCharsPerLine) {
+  const words = text.split(" ");
+  let lines = [];
+  let currentLine = "";
+
+  words.forEach(word => {
+    if ((currentLine + word).length <= maxCharsPerLine) {
+      currentLine += word + " ";
+    } else {
+      lines.push(currentLine.trim());
+      currentLine = word + " ";
+    }
+  });
+
+  if (currentLine) lines.push(currentLine.trim());
+
+  return lines.join("\\n");
+}
 
 app.post("/render", async (req, res) => {
   try {
@@ -67,8 +87,12 @@ app.post("/render", async (req, res) => {
       imageWriter.on("error", reject);
     });
 
+    const wrappedScript = wrapText(script, 35);
+
     const safeTitle = title.replace(/'/g, "\\'").replace(/:/g, "\\:");
-    const safeScript = script.replace(/'/g, "\\'").replace(/:/g, "\\:");
+    const safeScript = wrappedScript
+      .replace(/'/g, "\\'")
+      .replace(/:/g, "\\:");
 
     ffmpeg()
       .input(tempImage)
@@ -99,8 +123,9 @@ drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf:
 text='${safeScript}':
 fontsize=42:
 fontcolor=white:
+line_spacing=12:
 x=w*0.1:
-y=h*0.65:
+y=h*0.60:
 box=1:
 boxcolor=black@0.6:
 boxborderw=25,
