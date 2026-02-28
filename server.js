@@ -61,11 +61,12 @@ app.post("/render", async (req, res) => {
       .input(tempAudio)
       .videoCodec("libx264")
       .audioCodec("aac")
-      .size("720x1280")
+      .size("540x960")
       .outputOptions([
         "-shortest",
         "-pix_fmt yuv420p",
-        "-preset veryfast",
+        "-preset ultrafast",
+        "-crf 28",
         "-vf",
         `
 drawbox=x=0:y=0:w=iw:h=ih:color=black@0.35:t=fill,
