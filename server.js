@@ -60,10 +60,12 @@ app.post("/render", async (req, res) => {
       .videoCodec("libx264")
       .audioCodec("aac")
       .outputOptions([
-        "-pix_fmt yuv420p",
-        "-shortest",
+        "-preset ultrafast",
+        "-crf 28",
+        "-threads 1",
+        "-pix_fmt yuv420p"
         "-vf",
-        `scale=1080:1920,drawtext=text='${title}':fontcolor=gold:fontsize=60:x=(w-text_w)/2:y=100,drawtext=text='${script.replace(
+        `scale=720:1280,drawtext=text='${title}':fontcolor=gold:fontsize=60:x=(w-text_w)/2:y=100,drawtext=text='${script.replace(
           /'/g,
           "\\'"
         )}':fontcolor=white:fontsize=40:x=(w-text_w)/2:y=(h-text_h)/2`
