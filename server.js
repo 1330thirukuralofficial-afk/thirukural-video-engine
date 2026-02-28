@@ -12,18 +12,17 @@ app.use(express.json());
 
 const PORT = process.env.PORT || 8080;
 
-// Create folders if not exist
+// Create folders
 const videosDir = path.join(__dirname, "videos");
 const tempDir = path.join(__dirname, "temp");
 
 if (!fs.existsSync(videosDir)) fs.mkdirSync(videosDir);
 if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
 
-// ✅ USE DIRECT DROPBOX IMAGE LINK (dl.dropboxusercontent.com)
+// 🔥 USE DIRECT DROPBOX LINK
 const backgroundImage =
   "https://dl.dropboxusercontent.com/scl/fi/bzy46bdurxp3hxo33eofy/thiruvalluvar_background.jpg?rlkey=a7n3mlhull5tpgrg45jmpl636&st=upz2ig9y&dl=1";
 
-// Render API
 app.post("/render", async (req, res) => {
   try {
     const { title, script, audio_url } = req.body;
@@ -51,7 +50,7 @@ app.post("/render", async (req, res) => {
       writer.on("error", reject);
     });
 
-    // Escape text for FFmpeg
+    // Escape text
     const safeTitle = title.replace(/:/g, "\\:").replace(/'/g, "\\'");
     const safeScript = script.replace(/:/g, "\\:").replace(/'/g, "\\'");
 
@@ -61,18 +60,19 @@ app.post("/render", async (req, res) => {
       .input(tempAudio)
       .videoCodec("libx264")
       .audioCodec("aac")
-      .size("540x960")
+      .size("480x854") // 🔥 Lower resolution for stability
       .outputOptions([
+        "-preset ultrafast", // 🔥 Low CPU
+        "-crf 28",           // 🔥 Lower quality = lower memory
         "-shortest",
         "-pix_fmt yuv420p",
-        "-preset ultrafast",
-        "-crf 28",
+        "-r 24",             // 🔥 Reduce frame rate
         "-vf",
         `
 drawbox=x=0:y=0:w=iw:h=ih:color=black@0.35:t=fill,
 drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:
 text='${safeTitle}':
-fontsize=70:
+fontsize=55:
 fontcolor=gold:
 x=(w-text_w)/2:
 y=h*0.08:
@@ -81,25 +81,24 @@ shadowx=2:
 shadowy=2,
 drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf:
 text='${safeScript}':
-fontsize=45:
+fontsize=34:
 fontcolor=white:
-x=w*0.1:
+x=w*0.08:
 y=h*0.65:
 box=1:
 boxcolor=black@0.5:
-boxborderw=20,
+boxborderw=15,
 drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf:
 text='Thirukural Series':
-fontsize=30:
+fontsize=22:
 fontcolor=white:
 x=(w-text_w)/2:
 y=h*0.93
-`,
+`
       ])
       .save(outputVideo)
       .on("end", () => {
         fs.unlinkSync(tempAudio);
-
         res.json({
           success: true,
           video_url: `${req.protocol}://${req.get("host")}/video/${id}`,
@@ -109,6 +108,7 @@ y=h*0.93
         console.error("FFmpeg Error:", err);
         res.status(500).json({ error: "FFmpeg failed" });
       });
+
   } catch (error) {
     console.error("Server Error:", error);
     res.status(500).json({ error: "Server error" });
