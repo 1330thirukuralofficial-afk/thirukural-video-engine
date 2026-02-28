@@ -20,7 +20,7 @@ if (!fs.existsSync(videosDir)) fs.mkdirSync(videosDir);
 if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
 
 // Background image path (Make sure file exists in project root)
-const backgroundImage = path.join(__dirname, "thiruvalluvar_background.jpg");
+const backgroundImage = "https://dl.dropboxusercontent.com/scl/fi/bzy46bdurxp3hxo33eofy/thiruvalluvar_background.jpg?rlkey=a7n3mlhull5tpgrg45jmpl636&st=upz2ig9y&dl=1";
 
 app.post("/render", async (req, res) => {
   try {
@@ -55,7 +55,7 @@ app.post("/render", async (req, res) => {
 
     ffmpeg()
       .input(backgroundImage)
-      .loop()
+.     .inputOptions(["-loop 1"])
       .input(tempAudio)
       .videoCodec("libx264")
       .audioCodec("aac")
