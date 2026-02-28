@@ -10,18 +10,17 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-const PORT = process.env.PORT || 8080;
+const PORT = process.env.PORT || 10000;
 
 ffmpeg.setFfmpegPath("/usr/bin/ffmpeg");
 
-// Create folders
 const videosDir = path.join(__dirname, "videos");
 const tempDir = path.join(__dirname, "temp");
 
 if (!fs.existsSync(videosDir)) fs.mkdirSync(videosDir);
 if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
 
-// 🔥 USE YOUR DIRECT DROPBOX IMAGE LINK HERE
+// ✅ DIRECT DROPBOX BACKGROUND IMAGE
 const backgroundImageURL =
   "https://dl.dropboxusercontent.com/scl/fi/bzy46bdurxp3hxo33eofy/thiruvalluvar_background.jpg?rlkey=a7n3mlhull5tpgrg45jmpl636&st=upz2ig9y&dl=1";
 
@@ -38,7 +37,7 @@ app.post("/render", async (req, res) => {
     const tempAudio = path.join(tempDir, `${id}.mp3`);
     const tempImage = path.join(tempDir, `${id}.jpg`);
 
-    // 1️⃣ Download audio
+    // Download audio
     const audioResponse = await axios({
       method: "GET",
       url: audio_url,
@@ -53,7 +52,7 @@ app.post("/render", async (req, res) => {
       audioWriter.on("error", reject);
     });
 
-    // 2️⃣ Download image locally (IMPORTANT for stability)
+    // Download background image
     const imageResponse = await axios({
       method: "GET",
       url: backgroundImageURL,
@@ -68,30 +67,51 @@ app.post("/render", async (req, res) => {
       imageWriter.on("error", reject);
     });
 
-    // Escape text
     const safeTitle = title.replace(/'/g, "\\'").replace(/:/g, "\\:");
+    const safeScript = script.replace(/'/g, "\\'").replace(/:/g, "\\:");
 
-    // 3️⃣ Ultra-low memory FFmpeg
     ffmpeg()
       .input(tempImage)
       .inputOptions(["-loop 1"])
       .input(tempAudio)
-      .outputOptions([
-        "-vf",
-        `scale=360:640,
-         drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:
-         text='${safeTitle}':
-         fontsize=28:
-         fontcolor=white:
-         x=(w-text_w)/2:
-         y=40`,
-        "-shortest",
-        "-preset ultrafast",
-        "-threads 1",
-        "-pix_fmt yuv420p"
-      ])
       .videoCodec("libx264")
       .audioCodec("aac")
+      .size("720x1280")
+      .outputOptions([
+        "-preset veryfast",
+        "-crf 23",
+        "-shortest",
+        "-pix_fmt yuv420p",
+        "-r 30",
+        "-vf",
+        `
+drawbox=x=0:y=0:w=iw:h=ih:color=black@0.35:t=fill,
+drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:
+text='${safeTitle}':
+fontsize=70:
+fontcolor=gold:
+x=(w-text_w)/2:
+y=h*0.08:
+shadowcolor=black:
+shadowx=3:
+shadowy=3,
+drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf:
+text='${safeScript}':
+fontsize=42:
+fontcolor=white:
+x=w*0.1:
+y=h*0.65:
+box=1:
+boxcolor=black@0.6:
+boxborderw=25,
+drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf:
+text='Thirukural Series':
+fontsize=28:
+fontcolor=white:
+x=(w-text_w)/2:
+y=h*0.93
+`
+      ])
       .save(outputVideo)
       .on("end", () => {
         fs.unlinkSync(tempAudio);
@@ -113,10 +133,8 @@ app.post("/render", async (req, res) => {
   }
 });
 
-// Serve video
 app.get("/video/:id", (req, res) => {
   const videoPath = path.join(videosDir, `${req.params.id}.mp4`);
-
   if (fs.existsSync(videoPath)) {
     res.sendFile(videoPath);
   } else {
