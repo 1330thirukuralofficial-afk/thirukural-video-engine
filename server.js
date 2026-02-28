@@ -1,38 +1,26 @@
 const express = require("express");
-const axios = require("axios");
-const fs = require("fs-extra");
+const cors = require("cors");
 const ffmpeg = require("fluent-ffmpeg");
-const { v4: uuidv4 } = require("uuid");
 const path = require("path");
+const fs = require("fs");
+const axios = require("axios");
+const { v4: uuidv4 } = require("uuid");
 
 const app = express();
-app.use(express.json({ limit: "50mb" }));
+app.use(cors());
+app.use(express.json());
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 8080;
 
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`Server running on port ${PORT}`);
-});
+// Ensure directories exist
+const videosDir = path.join(__dirname, "videos");
+const tempDir = path.join(__dirname, "temp");
 
-// Change this to your public background image URL
-const BACKGROUND_URL = "https://www.dropbox.com/scl/fi/bzy46bdurxp3hxo33eofy/thiruvalluvar_background.jpg?rlkey=a7n3mlhull5tpgrg45jmpl636&st=r2dsts58&dl=1";
+if (!fs.existsSync(videosDir)) fs.mkdirSync(videosDir);
+if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
 
-async function downloadFile(url, outputPath) {
-  const response = await axios({
-    url,
-    method: "GET",
-    responseType: "stream",
-  });
-  return new Promise((resolve, reject) => {
-    const stream = response.data.pipe(fs.createWriteStream(outputPath));
-    stream.on("finish", resolve);
-    stream.on("error", reject);
-  });
-}
-
-app.get("/", (req, res) => {
-  res.send("Video engine running");
-});
+// Background image path (Make sure file exists in project root)
+const backgroundImage = path.join(__dirname, "thiruvalluvar_background.jpg");
 
 app.post("/render", async (req, res) => {
   try {
@@ -43,58 +31,132 @@ app.post("/render", async (req, res) => {
     }
 
     const id = uuidv4();
-    const workDir = path.join(__dirname, "tmp", id);
-    await fs.ensureDir(workDir);
+    const outputVideo = path.join(videosDir, `${id}.mp4`);
+    const tempAudio = path.join(tempDir, `${id}.mp3`);
 
-    const bgPath = path.join(workDir, "background.jpg");
-    const audioPath = path.join(workDir, "audio.mp3");
-    const outputPath = path.join(workDir, "output.mp4");
+    // Download audio
+    const response = await axios({
+      method: "GET",
+      url: audio_url,
+      responseType: "stream"
+    });
 
-    await downloadFile(BACKGROUND_URL, bgPath);
-    await downloadFile(audio_url, audioPath);
+    const writer = fs.createWriteStream(tempAudio);
+    response.data.pipe(writer);
+
+    await new Promise((resolve, reject) => {
+      writer.on("finish", resolve);
+      writer.on("error", reject);
+    });
+
+    // Escape text for FFmpeg
+    const safeTitle = title.replace(/:/g, "\\:").replace(/'/g, "\\'");
+    const safeScript = script.replace(/:/g, "\\:").replace(/'/g, "\\'");
 
     ffmpeg()
-      .input(bgPath)
+      .input(backgroundImage)
       .loop()
-      .input(audioPath)
+      .input(tempAudio)
       .videoCodec("libx264")
       .audioCodec("aac")
       .outputOptions([
-        "-preset ultrafast",
-        "-crf 28",
-        "-threads 1",
-        "-t 10",
-        "-pix_fmt yuv420p",
-        "-vf",
-        `scale=720:1280,drawtext=text='${title}':fontcolor=gold:fontsize=60:x=(w-text_w)/2:y=100,drawtext=text='${script.replace(
-          /'/g,
-          "\\'"
-        )}':fontcolor=white:fontsize=40:x=(w-text_w)/2:y=(h-text_h)/2`
+        "-preset veryfast",
+        "-shortest",
+        "-pix_fmt yuv420p"
       ])
-      .save(outputPath)
-      .on("end", async () => {
-        const videoUrl = `${req.protocol}://${req.get(
-          "host"
-        )}/video/${id}`;
-        res.json({ success: true, video_url: videoUrl });
+      .complexFilter([
+        // Dark overlay
+        {
+          filter: "drawbox",
+          options: {
+            x: 0,
+            y: 0,
+            w: "iw",
+            h: "ih",
+            color: "black@0.35",
+            t: "fill"
+          }
+        },
+        // Title
+        {
+          filter: "drawtext",
+          options: {
+            fontfile: "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+            text: safeTitle,
+            fontsize: 70,
+            fontcolor: "gold",
+            x: "(w-text_w)/2",
+            y: "h*0.08",
+            shadowcolor: "black",
+            shadowx: 2,
+            shadowy: 2,
+            alpha: "if(lt(t,1),t,1)"
+          }
+        },
+        // Script Text
+        {
+          filter: "drawtext",
+          options: {
+            fontfile: "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+            text: safeScript,
+            fontsize: 45,
+            fontcolor: "white",
+            x: "w*0.1",
+            y: "h*0.65",
+            box: 1,
+            boxcolor: "black@0.5",
+            boxborderw: 20,
+            alpha: "if(lt(t,1.5),t/1.5,1)"
+          }
+        },
+        // Footer Branding
+        {
+          filter: "drawtext",
+          options: {
+            fontfile: "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+            text: "Thirukural Series",
+            fontsize: 30,
+            fontcolor: "white",
+            x: "(w-text_w)/2",
+            y: "h*0.93",
+            alpha: 0.8
+          }
+        }
+      ])
+      .size("720x1280")
+      .save(outputVideo)
+      .on("end", () => {
+        fs.unlinkSync(tempAudio); // cleanup audio
+        res.json({
+          success: true,
+          video_url: `${req.protocol}://${req.get("host")}/video/${id}`
+        });
       })
       .on("error", (err) => {
-        console.error(err);
+        console.error("FFmpeg Error:", err);
         res.status(500).json({ error: "FFmpeg failed" });
       });
-  } catch (err) {
-    console.error(err);
+
+  } catch (error) {
+    console.error("Server error:", error);
     res.status(500).json({ error: "Server error" });
   }
 });
 
-app.get("/video/:id", async (req, res) => {
-  const id = req.params.id;
-  const filePath = path.join(__dirname, "tmp", id, "output.mp4");
-  if (await fs.pathExists(filePath)) {
-    res.sendFile(filePath);
+// Serve video
+app.get("/video/:id", (req, res) => {
+  const videoPath = path.join(videosDir, `${req.params.id}.mp4`);
+  if (fs.existsSync(videoPath)) {
+    res.sendFile(videoPath);
   } else {
     res.status(404).json({ error: "Video not found" });
   }
+});
 
+app.get("/", (req, res) => {
+  res.send("Thirukural Video Engine Running");
+});
+
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
 });
