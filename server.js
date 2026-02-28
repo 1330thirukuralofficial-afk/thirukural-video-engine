@@ -24,7 +24,7 @@ if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
 const backgroundImageURL =
   "https://dl.dropboxusercontent.com/scl/fi/bzy46bdurxp3hxo33eofy/thiruvalluvar_background.jpg?rlkey=a7n3mlhull5tpgrg45jmpl636&st=upz2ig9y&dl=1";
 
-// 🔥 Auto Text Wrap
+// 🔥 Auto text wrapping
 function wrapText(text, maxCharsPerLine) {
   const words = text.split(" ");
   let lines = [];
@@ -109,8 +109,8 @@ app.post("/render", async (req, res) => {
         "-r 30",
         "-vf",
         `
-zoompan=z='min(zoom+0.0005,1.08)':d=125,
-scale=720:1280,
+scale=760:1350,
+crop=720:1280,
 drawbox=x=0:y=0:w=iw:h=ih:color=black@0.35:t=fill,
 drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:
 text='${safeTitle}':
