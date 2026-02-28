@@ -12,6 +12,8 @@ app.use(express.json());
 
 const PORT = process.env.PORT || 8080;
 
+ffmpeg.setFfmpegPath("/usr/bin/ffmpeg");
+
 // Create folders
 const videosDir = path.join(__dirname, "videos");
 const tempDir = path.join(__dirname, "temp");
@@ -19,8 +21,8 @@ const tempDir = path.join(__dirname, "temp");
 if (!fs.existsSync(videosDir)) fs.mkdirSync(videosDir);
 if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
 
-// 🔥 USE DIRECT DROPBOX LINK
-const backgroundImage =
+// 🔥 USE YOUR DIRECT DROPBOX IMAGE LINK HERE
+const backgroundImageURL =
   "https://dl.dropboxusercontent.com/scl/fi/bzy46bdurxp3hxo33eofy/thiruvalluvar_background.jpg?rlkey=a7n3mlhull5tpgrg45jmpl636&st=upz2ig9y&dl=1";
 
 app.post("/render", async (req, res) => {
@@ -34,71 +36,67 @@ app.post("/render", async (req, res) => {
     const id = uuidv4();
     const outputVideo = path.join(videosDir, `${id}.mp4`);
     const tempAudio = path.join(tempDir, `${id}.mp3`);
+    const tempImage = path.join(tempDir, `${id}.jpg`);
 
-    // Download audio
-    const response = await axios({
+    // 1️⃣ Download audio
+    const audioResponse = await axios({
       method: "GET",
       url: audio_url,
       responseType: "stream",
     });
 
-    const writer = fs.createWriteStream(tempAudio);
-    response.data.pipe(writer);
+    const audioWriter = fs.createWriteStream(tempAudio);
+    audioResponse.data.pipe(audioWriter);
 
     await new Promise((resolve, reject) => {
-      writer.on("finish", resolve);
-      writer.on("error", reject);
+      audioWriter.on("finish", resolve);
+      audioWriter.on("error", reject);
+    });
+
+    // 2️⃣ Download image locally (IMPORTANT for stability)
+    const imageResponse = await axios({
+      method: "GET",
+      url: backgroundImageURL,
+      responseType: "stream",
+    });
+
+    const imageWriter = fs.createWriteStream(tempImage);
+    imageResponse.data.pipe(imageWriter);
+
+    await new Promise((resolve, reject) => {
+      imageWriter.on("finish", resolve);
+      imageWriter.on("error", reject);
     });
 
     // Escape text
-    const safeTitle = title.replace(/:/g, "\\:").replace(/'/g, "\\'");
-    const safeScript = script.replace(/:/g, "\\:").replace(/'/g, "\\'");
+    const safeTitle = title.replace(/'/g, "\\'").replace(/:/g, "\\:");
 
+    // 3️⃣ Ultra-low memory FFmpeg
     ffmpeg()
-      .input(backgroundImage)
+      .input(tempImage)
       .inputOptions(["-loop 1"])
       .input(tempAudio)
+      .outputOptions([
+        "-vf",
+        `scale=360:640,
+         drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:
+         text='${safeTitle}':
+         fontsize=28:
+         fontcolor=white:
+         x=(w-text_w)/2:
+         y=40`,
+        "-shortest",
+        "-preset ultrafast",
+        "-threads 1",
+        "-pix_fmt yuv420p"
+      ])
       .videoCodec("libx264")
       .audioCodec("aac")
-      .size("480x854") // 🔥 Lower resolution for stability
-      .outputOptions([
-        "-preset ultrafast", // 🔥 Low CPU
-        "-crf 28",           // 🔥 Lower quality = lower memory
-        "-shortest",
-        "-pix_fmt yuv420p",
-        "-r 24",             // 🔥 Reduce frame rate
-        "-vf",
-        `
-drawbox=x=0:y=0:w=iw:h=ih:color=black@0.35:t=fill,
-drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:
-text='${safeTitle}':
-fontsize=55:
-fontcolor=gold:
-x=(w-text_w)/2:
-y=h*0.08:
-shadowcolor=black:
-shadowx=2:
-shadowy=2,
-drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf:
-text='${safeScript}':
-fontsize=34:
-fontcolor=white:
-x=w*0.08:
-y=h*0.65:
-box=1:
-boxcolor=black@0.5:
-boxborderw=15,
-drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf:
-text='Thirukural Series':
-fontsize=22:
-fontcolor=white:
-x=(w-text_w)/2:
-y=h*0.93
-`
-      ])
       .save(outputVideo)
       .on("end", () => {
         fs.unlinkSync(tempAudio);
+        fs.unlinkSync(tempImage);
+
         res.json({
           success: true,
           video_url: `${req.protocol}://${req.get("host")}/video/${id}`,
