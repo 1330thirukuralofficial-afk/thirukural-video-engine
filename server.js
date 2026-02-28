@@ -57,91 +57,56 @@ app.post("/render", async (req, res) => {
       .input(backgroundImage)
       .inputOptions(["-loop 1"])
       .input(tempAudio)
+      .outputOptions([
+        "-vf",
+    `
+    drawbox=x=0:y=0:w=iw:h=ih:color=black@0.35:t=fill,
+    drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:
+    text='${safeTitle}':
+    fontsize=70:
+    fontcolor=gold:
+    x=(w-text_w)/2:
+    y=h*0.08:
+    shadowcolor=black:
+    shadowx=2:
+    shadowy=2,
+    drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf:
+    text='${safeScript}':
+    fontsize=45:
+    fontcolor=white:
+    x=w*0.1:
+    y=h*0.65:
+    box=1:
+    boxcolor=black@0.5:
+    boxborderw=20,
+    drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf:
+    text='Thirukural Series':
+    fontsize=30:
+    fontcolor=white:
+    x=(w-text_w)/2:
+    y=h*0.93
+    `
+      ])
       .videoCodec("libx264")
       .audioCodec("aac")
-      .outputOptions([
-        "-preset veryfast",
-        "-shortest",
-        "-pix_fmt yuv420p"
-      ])
-      .complexFilter([
-        // Dark overlay
-        {
-          filter: "drawbox",
-          options: {
-            x: 0,
-            y: 0,
-            w: "iw",
-            h: "ih",
-            color: "black@0.35",
-            t: "fill"
-          }
-        },
-        // Title
-        {
-          filter: "drawtext",
-          options: {
-            fontfile: "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
-            text: safeTitle,
-            fontsize: 70,
-            fontcolor: "gold",
-            x: "(w-text_w)/2",
-            y: "h*0.08",
-            shadowcolor: "black",
-            shadowx: 2,
-            shadowy: 2,
-            alpha: "if(lt(t,1),t,1)"
-          }
-        },
-        // Script Text
-        {
-          filter: "drawtext",
-          options: {
-            fontfile: "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-            text: safeScript,
-            fontsize: 45,
-            fontcolor: "white",
-            x: "w*0.1",
-            y: "h*0.65",
-            box: 1,
-            boxcolor: "black@0.5",
-            boxborderw: 20,
-            alpha: "if(lt(t,1.5),t/1.5,1)"
-          }
-        },
-        // Footer Branding
-        {
-          filter: "drawtext",
-          options: {
-            fontfile: "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-            text: "Thirukural Series",
-            fontsize: 30,
-            fontcolor: "white",
-            x: "(w-text_w)/2",
-            y: "h*0.93",
-            alpha: 0.8
-          }
-        }
-      ])
       .size("720x1280")
+      .outputOptions([
+        "-shortest",
+        "-pix_fmt yuv420p",
+        "-preset veryfast"
+      ])
       .save(outputVideo)
       .on("end", () => {
-        fs.unlinkSync(tempAudio); // cleanup audio
+        fs.unlinkSync(tempAudio);
         res.json({
           success: true,
           video_url: `${req.protocol}://${req.get("host")}/video/${id}`
-        });
-      })
-      .on("error", (err) => {
-        console.error("FFmpeg Error:", err);
-        res.status(500).json({ error: "FFmpeg failed" });
       });
-
-  } catch (error) {
-    console.error("Server error:", error);
-    res.status(500).json({ error: "Server error" });
-  }
-});
+  })
+  .on("error", (err) => {
+    console.error("FFmpeg Error:", err);
+    res.status(500).json({ error: "FFmpeg failed" });
+  });
 
 // Serve video
 app.get("/video/:id", (req, res) => {
