@@ -63,6 +63,7 @@ app.post("/render", async (req, res) => {
         "-preset ultrafast",
         "-crf 28",
         "-threads 1",
+        "-t 10",
         "-pix_fmt yuv420p"
         "-vf",
         `scale=720:1280,drawtext=text='${title}':fontcolor=gold:fontsize=60:x=(w-text_w)/2:y=100,drawtext=text='${script.replace(
