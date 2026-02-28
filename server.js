@@ -26,6 +26,10 @@ async function downloadFile(url, outputPath) {
   });
 }
 
+app.get("/", (req, res) => {
+  res.send("Video engine running");
+});
+
 app.post("/render", async (req, res) => {
   try {
     const { title, script, audio_url } = req.body;
