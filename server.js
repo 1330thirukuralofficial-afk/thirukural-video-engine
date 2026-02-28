@@ -11,7 +11,7 @@ app.use(express.json({ limit: "50mb" }));
 const PORT = process.env.PORT || 3000;
 
 // Change this to your public background image URL
-const BACKGROUND_URL = "https://your-public-background-image.jpg";
+const BACKGROUND_URL = "https://www.dropbox.com/scl/fi/bzy46bdurxp3hxo33eofy/thiruvalluvar_background.jpg?rlkey=a7n3mlhull5tpgrg45jmpl636&st=r2dsts58&dl=1";
 
 async function downloadFile(url, outputPath) {
   const response = await axios({
